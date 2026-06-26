@@ -9,17 +9,18 @@
 #include "lwip/sys.h"
 #include "mqtt_client.h"
 #include "driver/gpio.h"
-
 #include "esp_netif.h"
 
+// =================================================================
+// ATENÇÃO: Atualize com os dados do Roteador Físico e IP da BBB
+// =================================================================
 #define WIFI_SSID      "MERCUSYS_7E02"
 #define WIFI_PASS      "70960594"
-
-#define MQTT_BROKER_URI "mqtt://10.1.133.82:1883"
+#define MQTT_BROKER_URI "mqtt://192.168.1.XXX" 
 #define MQTT_TOPIC      "ifpb/projeto/led"
-#define LED_GPIO        GPIO_NUM_5 // Altere para o pino que for usar no ESP32-C6
+#define LED_GPIO        GPIO_NUM_5
 
-static const char *TAG = "NODE_B_ACTUATOR";
+static const char *TAG = "NODE_B_SUBSCRIBER_V2";
 
 // Event Handler do MQTT
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
@@ -29,26 +30,19 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED: Conectado ao Broker!");
-            // Inscreve-se no tópico imediatamente após conectar
+            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED: Conectado ao Gateway BBB!");
             msg_id = esp_mqtt_client_subscribe(client, MQTT_TOPIC, 1);
-            ESP_LOGI(TAG, "Inscrito com sucesso no tópico %s, ID do envio: %d", MQTT_TOPIC, msg_id);
+            ESP_LOGI(TAG, "Inscrito com sucesso no tópico %s, ID: %d", MQTT_TOPIC, msg_id);
             break;
 
         case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG, "MQTT_EVENT_DATA: Dados recebidos!");
+            ESP_LOGI(TAG, "MQTT_EVENT_DATA: Dados recebidos do Gateway!");
             
-            // Cria buffers temporários garantindo que a string termine em '\0'
-            char topic_buff[64] = {0};
             char data_buff[16] = {0};
-            
-            int topic_len = event->topic_len < sizeof(topic_buff) ? event->topic_len : sizeof(topic_buff) - 1;
             int data_len = event->data_len < sizeof(data_buff) ? event->data_len : sizeof(data_buff) - 1;
-            
-            memcpy(topic_buff, event->topic, topic_len);
             memcpy(data_buff, event->data, data_len);
 
-            ESP_LOGI(TAG, "Tópico: %s -> Mensagem: %s", topic_buff, data_buff);
+            ESP_LOGI(TAG, "Mensagem: %s", data_buff);
 
             // Validação usando strcmp para acionamento do LED
             if (strcmp(data_buff, "ON") == 0) {
@@ -57,13 +51,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             } else if (strcmp(data_buff, "OFF") == 0) {
                 gpio_set_level(LED_GPIO, 0);
                 ESP_LOGI(TAG, "LED desligado (LOW)");
-            } else {
-                ESP_LOGW(TAG, "Comando desconhecido recebido.");
             }
             break;
 
         case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED: Conexão perdida com o Broker.");
+            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED: Conexão perdida com o Gateway.");
             break;
         default:
             break;
@@ -79,7 +71,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "Tentando reconectar ao Wi-Fi...");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Wi-Fi Conectado! IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "Wi-Fi Conectado! IP do Node B: " IPSTR, IP2STR(&event->ip_info.ip));
     }
 }
 
@@ -107,7 +99,6 @@ void wifi_init_sta(void) {
 }
 
 void app_main(void) {
-    // Inicializa NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
@@ -115,10 +106,8 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    // Inicializa Wi-Fi
     wifi_init_sta();
 
-    // Configuração do GPIO do LED
     gpio_config_t io_conf = {
         .intr_type = GPIO_INTR_DISABLE,
         .mode = GPIO_MODE_OUTPUT,
@@ -127,9 +116,8 @@ void app_main(void) {
         .pull_up_en = GPIO_PULLUP_DISABLE,
     };
     gpio_config(&io_conf);
-    gpio_set_level(LED_GPIO, 0); // Começa desligado
+    gpio_set_level(LED_GPIO, 0);
 
-    // Inicializa MQTT
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = MQTT_BROKER_URI,
     };

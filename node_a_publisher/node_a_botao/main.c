@@ -10,17 +10,19 @@
 #include "lwip/sys.h"
 #include "mqtt_client.h"
 #include "driver/gpio.h"
-
 #include "esp_netif.h"
+
+// =================================================================
+// ATENÇÃO: Atualize com os dados do Roteador Físico e IP da BBB
+// =================================================================
 
 #define WIFI_SSID      "MERCUSYS_7E02"
 #define WIFI_PASS      "70960594"
-
-#define MQTT_BROKER_URI "mqtt://10.1.133.82:1883"
+#define MQTT_BROKER_URI "mqtt://192.168.1.XXX" 
 #define MQTT_TOPIC      "ifpb/projeto/led"
-#define BUTTON_GPIO     GPIO_NUM_4 // Altere para o pino que for usar no ESP32-C6
+#define BUTTON_GPIO     GPIO_NUM_4
 
-static const char *TAG = "NODE_A_PUBLISHER";
+static const char *TAG = "NODE_A_PUBLISHER_V2";
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 static QueueHandle_t gpio_evt_queue = NULL;
 static bool led_state = false;
@@ -49,7 +51,7 @@ static void button_task(void* arg) {
                 
                 if (mqtt_client != NULL) {
                     int msg_id = esp_mqtt_client_publish(mqtt_client, MQTT_TOPIC, message, 0, 1, 0);
-                    ESP_LOGI(TAG, "Botão pressionado! Publicado '%s' no tópico. ID: %d", message, msg_id);
+                    ESP_LOGI(TAG, "Botão pressionado! Publicado '%s' no Gateway BBB. ID: %d", message, msg_id);
                 } else {
                     ESP_LOGW(TAG, "MQTT não conectado ainda.");
                 }
@@ -63,11 +65,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_event_handle_t event = event_data;
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED: Conectado ao Broker!");
+            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED: Conectado ao Gateway BBB!");
             mqtt_client = event->client;
             break;
         case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED: Desconectado do Broker.");
+            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED: Desconectado do Gateway.");
             mqtt_client = NULL;
             break;
         default:
@@ -84,7 +86,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "Tentando reconectar ao Wi-Fi...");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Wi-Fi Conectado! IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "Wi-Fi Conectado! IP do Node A: " IPSTR, IP2STR(&event->ip_info.ip));
     }
 }
 
@@ -112,7 +114,6 @@ void wifi_init_sta(void) {
 }
 
 void app_main(void) {
-    // Inicializa NVS (necessário para o Wi-Fi)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
@@ -120,28 +121,23 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    // Inicializa Wi-Fi
     wifi_init_sta();
 
-    // Configuração do GPIO do Botão
     gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_NEGEDGE, // Interrupção na borda de descida (pressionado)
+        .intr_type = GPIO_INTR_NEGEDGE,
         .mode = GPIO_MODE_INPUT,
         .pin_bit_mask = (1ULL << BUTTON_GPIO),
-        .pull_up_en = GPIO_PULLUP_ENABLE, // Altere se usar resistor de pull-down externo
+        .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
     };
     gpio_config(&io_conf);
 
-    // Cria a fila para a Task do Botão
     gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     xTaskCreate(button_task, "button_task", 3072, NULL, 10, NULL);
 
-    // Instala o serviço de ISR do GPIO
     gpio_install_isr_service(0);
     gpio_isr_handler_add(BUTTON_GPIO, gpio_isr_handler, (void*) BUTTON_GPIO);
 
-    // Inicializa MQTT
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = MQTT_BROKER_URI,
     };

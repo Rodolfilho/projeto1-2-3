@@ -1,39 +1,74 @@
-<<<<<<< HEAD
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C6 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
+# 💡 Projeto 2: Controle de Iluminação (Gateway BBB) - IoT 2026.1
 
-# _Sample project_
+Este repositório contém a **Versão 2** do sistema de controle IoT descentralizado. [cite_start]O objetivo desta atividade é evoluir a arquitetura do sistema anterior, introduzindo um Gateway Local dedicado[cite: 32]. [cite_start]Neste projeto, configuramos serviços de infraestrutura em um sistema Linux embarcado (BeagleBone Black) para centralizar a comunicação da rede de sensores e atuadores[cite: 33].
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+---
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+## 📡 1. Arquitetura do Sistema
 
+A nova topologia de rede é estruturada da seguinte forma:
+* [cite_start]**Infraestrutura Wi-Fi:** Um roteador wireless atua como Access Point, interconectando os Nodes via Wi-Fi e o Gateway via cabo Ethernet[cite: 37].
+* [cite_start]**Gateway (BeagleBone Black):** Atua como o cérebro da rede local, hospedando o Broker MQTT Mosquitto e gerenciando o tráfego de mensagens[cite: 38].
+* [cite_start]**Nodes (ESP32-C6):** Mantêm as funções originais de sensor (botão) e atuador (LED), mas agora apontam o endereço do Broker MQTT para o IP do novo Gateway[cite: 36].
+    * **Node A (Publisher):** Lê o estado do botão físico e publica "ON" ou "OFF".
+    * **Node B (Subscriber):** Assina o tópico e atua no LED recebendo mensagens do Gateway.
 
+### 🛜 Tópico MQTT Utilizado
+* `ifpb/projeto/led`
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
+---
 
-## Example folder contents
+## 🛠️ 2. Requisitos Técnicos
 
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
+* [cite_start]**Hardware:** * 02 Módulos ESP32-C6[cite: 41].
+  * [cite_start]01 BeagleBone Black (BBB) com SDCard e cabo Ethernet[cite: 42, 43].
+  * [cite_start]01 Roteador Wi-Fi[cite: 44].
+  * [cite_start]Botão, LED e resistores do Projeto 1[cite: 45].
+* [cite_start]**Software e Protocolos:** * ESP-IDF (v5.x) utilizando linguagem C[cite: 47].
+  * [cite_start]Protocolo de Aplicação MQTT (`espressif/mqtt`)[cite: 49].
+  * [cite_start]SO Gateway: Debian/Ubuntu for BeagleBone[cite: 50].
+  * [cite_start]Broker: Mosquitto[cite: 51].
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
+---
 
-Below is short explanation of remaining files in the project folder.
+## 📂 3. Estrutura do Repositório
 
-```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
-```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
-=======
-# projeto1-2-3
->>>>>>> 86eca9d9ba59b55f3a1179faa8a915e4383f6084
+```text
+nome-do-repositorio/
+├── node_a_publisher/      # Código do Nó A (Botão/Interruptor)
+│   ├── CMakeLists.txt
+│   └── main/
+│       ├── CMakeLists.txt
+│       └── main.c
+├── node_b_subscriber/     # Código do Nó B (LED/Atuador)
+│   ├── CMakeLists.txt
+│   └── main/
+│       ├── CMakeLists.txt
+│       └── main.c
+└── README.md
+
+#Atualizamos o sistema, instalamos o broker e as ferramentas de cliente, garantindo a inicialização automática:  
+
+sudo apt update  # Atualiza a lista de pacotes [cite: 68, 69]
+sudo apt install mosquitto mosquitto-clients -y  # Instala o broker e ferramentas [cite: 70, 71]
+sudo systemctl enable mosquitto  # Garante início automático [cite: 72, 73]
+
+#Foi criado um arquivo de configuração personalizada para liberar o acesso na porta 1883 de forma anônima:
+sudo nano /etc/mosquitto/conf.d/external.conf  # Criação do arquivo [cite: 87]
+
+#Conteúdo inserido no arquivo:
+listener 1883 0.0.0.0  # Escuta em todas as interfaces de rede [cite: 90, 91]
+allow_anonymous true  # Permite conexões sem usuário/senha [cite: 92, 93]
+
+#Após salvar (Ctrl+O, Enter, Ctrl+X ), o serviço foi reiniciado:
+
+sudo systemctl restart mosquitto  # Aplica as novas regras [cite: 96]
+
+sudo systemctl restart mosquitto  # Aplica as novas regras [cite: 96]
+
+| Nome | Matrícula / GitHub |
+| :--- | :--- |
+| José Rodolfo Rocha Filho | [@Rodolfilho](https://github.com/Rodolfilho) |
+| Matheus Monteiro Maciel | [@MatheusMonteiro10](https://github.com/MatheusMonteiro10) |
+| Nyedson Lorran Queiroz Barros | [@NyedsonLorran](https://github.com/NyedsonLorran) |
+| Vinicius Gabriel Xavier Basilio | [@ViniciusGbasilio](https://github.com/ViniciusGbasilio) |
